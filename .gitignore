@@ -1,0 +1,15 @@
+
+# Archivos de compilación
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Configuración privada
+appsettings.Development.json
+
+# Logs
+*.log
