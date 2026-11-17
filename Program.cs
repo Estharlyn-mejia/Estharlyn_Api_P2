@@ -1,5 +1,6 @@
 using Estharlyn_Ap1_P2.Components;
 using Estharlyn_Ap1_P2.Contexto;
+using Estharlyn_Ap1_P2.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +14,7 @@ var ConStr = builder.Configuration.GetConnectionString("SqlConStr");
 
 builder.Services.AddDbContextFactory<Contexto>(options =>
     options.UseSqlite(ConStr));
+builder.Services.AddScoped<ServicesVentas>();
 
 // Construcción de la aplicación
 var app = builder.Build();

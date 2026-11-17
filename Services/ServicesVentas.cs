@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 
 namespace Estharlyn_Ap1_P2.Services;
 
-public class Services(IDbContextFactory<Estharlyn_Ap1_P2.Contexto.Contexto> contextFactory)
+public class ServicesVentas(IDbContextFactory<Estharlyn_Ap1_P2.Contexto.Contexto> contextFactory)
     : IServiceResult<Venta, int>
 {
     public async Task<Result> Guardar(Venta venta)
