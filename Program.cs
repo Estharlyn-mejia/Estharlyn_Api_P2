@@ -9,15 +9,23 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Conexión SQLite
-var ConStr = builder.Configuration.GetConnectionString("SqlConStr");
+// Conexión SQLite: el archivo queda en la carpeta de la app
+var dbPath = Path.Combine(builder.Environment.ContentRootPath, "Estharlyn.db");
 
 builder.Services.AddDbContextFactory<Contexto>(options =>
-    options.UseSqlite(ConStr));
+    options.UseSqlite($"Data Source={dbPath}"));
+
 builder.Services.AddScoped<ServicesVentas>();
 
-// Construcción de la aplicación
 var app = builder.Build();
+
+// Crea las tablas (y los productos iniciales) si no existen
+using (var scope = app.Services.CreateScope())
+{
+    var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<Contexto>>();
+    using var db = factory.CreateDbContext();
+    db.Database.Migrate();
+}
 
 // Configuración HTTP
 if (!app.Environment.IsDevelopment())
@@ -26,9 +34,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseStatusCodePagesWithReExecute(
-    "/not-found",
-    createScopeForStatusCodePages: true);
+app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 
 app.UseHttpsRedirection();
 
