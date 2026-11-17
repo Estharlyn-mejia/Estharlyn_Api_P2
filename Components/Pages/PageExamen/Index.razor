@@ -1,79 +1,217 @@
 @page "/Index"
+@using Estharlyn_Ap1_P2.Models
+@using Estharlyn_Ap1_P2.Services
+@using Microsoft.AspNetCore.Components.QuickGrid
+@inject ServicesVentas ServicesVentas
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 @rendermode InteractiveServer
 
-<PageTitle>Examen segundo parcial</PageTitle>
+<PageTitle>Ventas de cafe</PageTitle>
 
 <div class="container-fluid mt-4">
     <div class="card shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center bg-light">
-            <h5 class="card-title mb-0">Consultas</h5>
-            <a class="btn btn-primary" href="/Crear">
-                <span class="bi bi-plus-square"></span>
-                Crear
-            </a>
+            <h5 class="card-title mb-0">Consulta de ventas</h5>
+            <button type="button" 
+                    class="btn btn-primary" 
+                    @onclick="MostrarPantallaCrear">
+                Registrar venta
+            </button>
         </div>
 
-        @*Formulario*@
         <div class="card-body">
-            
-            @*Labels*@
-            <div class="row">
-                <div class="col-3">
-                    <label class="form-label" for="Filtro">
-                        <strong>Filtrar por</strong>
+            @if (!string.IsNullOrWhiteSpace(mensaje))
+            {
+                <div class="alert @(esError ? "alert-danger" : "alert-success")" role="alert">
+                    @mensaje
+                </div>
+            }
+
+            <div class="row g-3 align-items-end">
+                <div class="col-sm-6 col-lg-2">
+                    <label class="form-label" for="filtroVentaId">
+                        <strong>VentaId</strong>
                     </label>
+                    <InputNumber id="filtroVentaId" 
+                                TValue="int?" 
+                                class="form-control" 
+                                @bind-Value="ventaIdFiltro" />
                 </div>
-
-                <div class="col-4">
-                    <label class="form-label" for="valorFiltro">
-                        <strong>Busqueda</strong>
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label" for="filtroConcepto">
+                        <strong>Concepto</strong>
                     </label>
+                    <input id="filtroConcepto" 
+                            class="form-control" 
+                            @bind="conceptoFiltro" 
+                            placeholder="Producto u observacion" />
                 </div>
-            </div>
-
-            @*Inputs y botones*@
-            <div class="row">
-                @*Filtro*@
-                <div class="col-3">
-                    <select class="form-select" @bing="filtro">
-                        <option value="">
-                            Elija una opcion
-                        </option>
-                    </select>
+                <div class="col-sm-6 col-lg-2">
+                    <label class="form-label" for="fechaDesde">
+                        <strong>Fecha desde</strong>
+                    </label>
+                    <InputDate id="fechaDesde" 
+                                TValue="DateTime?" 
+                                class="form-control" 
+                                @bind-Value="fechaDesde" />
                 </div>
-
-                @*Busqueda*@
-                <div class="col-4">
-
-                    <div class="input-gruop">
-                        <input class="form-control"
-                                @bind="valorFiltro"
-                                placeholder="Buscar" />
-
-                        <button type="button"
-                                class="btn btn-outline-primary"
-                                @onclick="">
-                            Buscar
-                        </button>
-                    </div>
+                <div class="col-sm-6 col-lg-2">
+                    <label class="form-label" for="fechaHasta">
+                        <strong>Fehca hasta</strong>
+                    </label>
+                    <InputDate id="fechaHasta" 
+                                TValue="DateTime?" 
+                                class="form-control" 
+                                @bind-Value="fechaHasta" />
                 </div>
+                <div class="col-lg-auto">
+                    <button type="button" 
+                            class="btn btn-outline-primary" 
+                            @onclick="Buscar">
+                        Buscar
+                    </button>
 
-                @*Restablecer*@
-                <div class="col-auto">
-                    <button type="button"
-                            class="btn btn-outline-secondary"
-                            @onclick="">
+                    <button type="button" 
+                            class="btn btn-outline-secondary" 
+                            @onclick="Restablecer">
                         Restablecer
                     </button>
                 </div>
             </div>
+
+            @if (cargando)
+            {
+                <p class="mt-3">Cargando ventas...</p>
+            }
+            else
+            {
+                <QuickGrid Items="ListaVentas.AsQueryable()"
+                            class="table table-bordered table-striped mt-3 text-center">
+                    <PropertyColumn Property="venta => venta.VentaId" Title="VentaId" Sortable="true" />
+                    <PropertyColumn Property="venta => venta.Fecha" Title="Fecha" Format="yyyy-MM-dd" Sortable="true" />
+                    <PropertyColumn Property="venta => venta.Observacion" Title="Observacion" />
+                    <TemplateColumn Title="Productos">
+                        @foreach (var detalle in context.Detalles)
+                        {
+                            <div>@detalle.Producto.Nombre x @detalle.Cantidad</div>
+                        }
+                    </TemplateColumn>
+                    <PropertyColumn Property="venta => venta.Total" Title="Total" Format="C" Sortable="true" />
+                    <TemplateColumn Title="Accion">
+                        <button type="button"
+                                class="btn btn-outline-warning btn-sm me-1"
+                                @onclick="() => MostrarPantallaEditar(context.VentaId)">
+                            Modificar
+                        </button>
+                        <button type="button"
+                                class="btn btn-outline-danger btn-sm"
+                                @onclick="() => Eliminar(context.VentaId)">
+                            Eliminar
+                        </button>
+                    </TemplateColumn>
+                </QuickGrid>
+
+                <div class="d-flex justify-content-between">
+                    <p><strong>Cantidad:</strong> @ListaVentas.Count</p>
+                    <p><strong>Total vendido:</strong> @ListaVentas.Sum(venta => venta.Total).ToString("C")</p>
+                </div>
+            }
         </div>
     </div>
 </div>
 
-@code{
-    public string? filtro { get; set; }
-    public string? valorFiltro { get; set; }
+@code {
+    private List<Venta> ListaVentas { get; set; } = [];
+    private int? ventaIdFiltro;
+    private string? conceptoFiltro;
+    private DateTime? fechaDesde;
+    private DateTime? fechaHasta;
+    private string? mensaje;
+    private bool esError;
+    private bool cargando = true;
 
+    protected override Task OnInitializedAsync() => Buscar();
+
+    private async Task Buscar()
+    {
+        cargando = true;
+        mensaje = null;
+        esError = false;
+
+        if (fechaDesde is DateTime inicio && fechaHasta is DateTime fin && inicio.Date > fin.Date)
+        {
+            ListaVentas = [];
+            mensaje = "La fecha desde no puede ser posterior a la fecha hasta.";
+            esError = true;
+            cargando = false;
+            return;
+        }
+
+        var id = ventaIdFiltro;
+        var concepto = conceptoFiltro?.Trim();
+        var desde = fechaDesde?.Date;
+        var hastaExclusivo = fechaHasta?.Date.AddDays(1);
+
+        var resultado = await ServicesVentas.GetList(venta =>
+            (!id.HasValue || venta.VentaId == id.Value) &&
+            (string.IsNullOrEmpty(concepto) ||
+                (venta.Observacion != null && venta.Observacion.Contains(concepto)) ||
+                venta.Detalles.Any(detalle => detalle.Producto.Nombre.Contains(concepto))) &&
+            (!desde.HasValue || venta.Fecha >= desde.Value) &&
+            (!hastaExclusivo.HasValue || venta.Fecha < hastaExclusivo.Value));
+
+        if (resultado.IsSuccess)
+        {
+            ListaVentas = resultado.Value
+                .OrderByDescending(venta => venta.Fecha)
+                .ThenByDescending(venta => venta.VentaId)
+                .ToList();
+        }
+        else
+        {
+            ListaVentas = [];
+            mensaje = resultado.Error.Description;
+            esError = true;
+        }
+
+        cargando = false;
+    }
+
+    private async Task Restablecer()
+    {
+        ventaIdFiltro = null;
+        conceptoFiltro = null;
+        fechaDesde = null;
+        fechaHasta = null;
+        await Buscar();
+    }
+
+    private void MostrarPantallaCrear()
+    {
+        Navigation.NavigateTo("/Ventas/Crear");
+    }
+
+    private void MostrarPantallaEditar(int id)
+    {
+        Navigation.NavigateTo($"/Ventas/Editar/{id}");
+    }  
+
+    private async Task Eliminar(int id)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Eliminar la venta {id} y devolver los productos al inventario?"))
+            return;
+
+        var resultado = await ServicesVentas.Eliminar(id);
+        if (resultado.IsFailure)
+        {
+            mensaje = resultado.Error.Description;
+            esError = true;
+            return;
+        }
+
+        mensaje = "Venta eliminada y stock restituido correctamente.";
+        esError = false;
+        await Buscar();
+    }
 }
