@@ -1,0 +1,364 @@
+@page "/Ventas/Editar/{Id:int}"
+@using Estharlyn_Ap1_P2.Models
+@using Estharlyn_Ap1_P2.Services
+@inject ServicesVentas ServicesVentas
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Modificar Venta</PageTitle>
+
+<div class="container-fluid mt-4 px-3 px-lg-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <h3 class="mb-0">Modificar Venta #@Id</h3>
+        </div>
+
+        @if (cargando)
+        {
+            <div class="card-body">
+                <p class="mb-0">Cargando venta...</p>
+            </div>
+        }
+        else if (!encontrada)
+        {
+            <div class="card-body">
+                <div class="alert alert-danger mb-0">@mensaje</div>
+            </div>
+            <div class="card-footer bg-light d-flex justify-content-center">
+                <button type="button" 
+                        class="btn btn-outline-secondary" 
+                        @onclick="Volver">
+                    Volver
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="card-body">
+                @if (!string.IsNullOrWhiteSpace(mensaje))
+                {
+                    <div class="alert @(error ? "alert-danger" : "alert-success")" role="alert">
+                        @mensaje
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label" for="fecha"><strong>Fecha:</strong></label>
+                    <input id="fecha" 
+                            type="date" 
+                            class="form-control" 
+                            @bind="venta.Fecha" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="observacion"><strong>Observacion:</strong></label>
+                    <input id="observacion" 
+                            type="text" 
+                            class="form-control" 
+                            maxlength="250" 
+                            @bind="venta.Observacion" />
+                </div>
+
+                <section class="border border-success rounded mb-3">
+                    <h4 class="h5 px-3 py-2 border-bottom mb-0">Productos de la venta</h4>
+                    <div class="p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="text-muted">Modifique los productos o las cantidades.</span>
+                            <button type="button" 
+                                    class="btn btn-primary" 
+                                    @onclick="AgregarDetalle">
+                                Agregar producto
+                            </button>
+                        </div>
+
+                        @if (venta.Detalles.Count == 0)
+                        {
+                            <div class="alert alert-warning">
+                                Agregue al menos un detalle antes de guardar la venta.
+                            </div>
+                        }
+                        else
+                        {
+                            <table class="table table-bordered table-striped align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>
+                                            Producto
+                                        </th>
+                                        <th style="width:150px">
+                                            Cantidad
+                                        </th>
+                                        <th>
+                                            Precio
+                                        </th>
+                                        <th>
+                                            Subtotal
+                                        </th>
+                                        <th>
+                                            Accion
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var detalle in venta.Detalles.ToList())
+                                    {
+                                        <tr @key="detalle">
+                                            <td>
+                                                <select class="form-select"
+                                                        value="@detalle.ProductoId"
+                                                        @onchange="e => CambiarProducto(detalle, e)">
+                                                    <option value="0">Seleccione un producto</option>
+                                                    @foreach (var producto in productos)
+                                                    {
+                                                        <option value="@producto.ProductoId">
+                                                            @producto.Nombre - Stock: @StockDisponible(producto)
+                                                        </option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input type="number"
+                                                        class="form-control"
+                                                        min="1"
+                                                        value="@detalle.Cantidad"
+                                                        @onchange="e => CambiarCantidad(detalle, e)" />
+                                            </td>
+                                            <td>
+                                                @(detalle.ProductoId > 0 ? detalle.Precio.ToString("C") : "Seleccione un producto")
+                                            </td>
+                                            <td>
+                                                @Subtotal(detalle).ToString("C")
+                                            </td>
+                                            <td>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-danger"
+                                                        @onclick="() => QuitarDetalle(detalle)">
+                                                    Eliminar
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>Cantidad de detalles: @venta.Detalles.Count</strong>
+                            <strong>Total: @TotalVenta.ToString("C")</strong>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="card-footer bg-light d-flex justify-content-center gap-2">
+                <button type="button" 
+                        class="btn btn-success" 
+                        @onclick="Guardar" 
+                        disabled="@(guardando || eliminando)">
+                    @(guardando ? "Guardando..." : "Guardar cambios")
+                </button>
+                <button type="button"
+                        class="btn btn-outline-danger"
+                        @onclick="EliminarVenta"
+                        disabled="@(guardando || eliminando)">
+                    @(eliminando ? "Eliminando..." : "Eliminar venta")
+                </button>
+                <button type="button" 
+                        class="btn btn-outline-secondary" 
+                        @onclick="Volver" 
+                        disabled="@(guardando || eliminando)">
+                    Volver
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Venta venta = new();
+    private List<Producto> productos = [];
+
+    // Cantidades que ya tenia la venta guardada, por producto.
+    // Sirven para mostrar el stock real disponible al modificar.
+    private Dictionary<int, int> cantidadesOriginales = new();
+
+    private string mensaje = string.Empty;
+    private bool error;
+    private bool cargando = true;
+    private bool encontrada;
+    private bool guardando;
+    private bool eliminando;
+
+    private decimal TotalVenta => venta.Detalles.Sum(Subtotal);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            productos = await ServicesVentas.ListarProductos();
+
+            var resultado = await ServicesVentas.Buscar(Id);
+
+            if (resultado.IsFailure || resultado.Value is null)
+            {
+                encontrada = false;
+                mensaje = $"No se encontró la venta #{Id}.";
+                return;
+            }
+
+            var guardada = resultado.Value;
+
+            venta = new Venta
+            {
+                VentaId = guardada.VentaId,
+                Fecha = guardada.Fecha,
+                Observacion = guardada.Observacion,
+                Total = guardada.Total,
+                Detalles = guardada.Detalles
+                    .Select(d => new DetalleVenta
+                    {
+                        ProductoId = d.ProductoId,
+                        Cantidad = d.Cantidad,
+                        Precio = productos.FirstOrDefault(p => p.ProductoId == d.ProductoId)?.Precio ?? d.Precio
+                    })
+                    .ToList()
+            };
+
+            cantidadesOriginales = guardada.Detalles
+                .GroupBy(d => d.ProductoId)
+                .ToDictionary(g => g.Key, g => g.Sum(d => d.Cantidad));
+
+            encontrada = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar la venta: {ex}");
+            encontrada = false;
+            mensaje = $"Ocurrió un error al cargar la venta: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private int StockDisponible(Producto producto) =>
+        producto.Stock + cantidadesOriginales.GetValueOrDefault(producto.ProductoId);
+
+    private void AgregarDetalle()
+    {
+        venta.Detalles.Add(new DetalleVenta { Cantidad = 1 });
+        mensaje = string.Empty;
+    }
+
+    private void QuitarDetalle(DetalleVenta detalle) =>
+        venta.Detalles.Remove(detalle);
+
+    private void CambiarProducto(DetalleVenta detalle, ChangeEventArgs e)
+    {
+        detalle.ProductoId = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+
+        var producto = productos.FirstOrDefault(p => p.ProductoId == detalle.ProductoId);
+        detalle.Precio = producto?.Precio ?? 0m;
+    }
+
+    private void CambiarCantidad(DetalleVenta detalle, ChangeEventArgs e)
+    {
+        detalle.Cantidad = int.TryParse(e.Value?.ToString(), out var cantidad) ? cantidad : 0;
+    }
+
+    private decimal Subtotal(DetalleVenta detalle) =>
+        Math.Max(0, detalle.Cantidad) * detalle.Precio;
+
+    private async Task Guardar()
+    {
+        if (guardando || eliminando)
+            return;
+
+        mensaje = string.Empty;
+        error = false;
+
+        if (venta.Detalles.Count == 0)
+        {
+            mensaje = "Debe agregar al menos un detalle antes de guardar la venta.";
+            error = true;
+            return;
+        }
+
+        if (venta.Detalles.Any(d => d.ProductoId <= 0 || d.Cantidad <= 0))
+        {
+            mensaje = "Seleccione un producto y escriba una cantidad mayor a cero en cada detalle.";
+            error = true;
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            // Como VentaId > 0, el servicio devuelve el stock anterior
+            // y descuenta el nuevo dentro de la misma transaccion.
+            var resultado = await ServicesVentas.Guardar(venta);
+
+            if (resultado.IsSuccess)
+            {
+                Navigation.NavigateTo("/Index?ventaGuardada=true");
+                return;
+            }
+
+            mensaje = resultado.Error.Description;
+            error = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al modificar la venta: {ex}");
+            mensaje = $"Ocurrió un error al guardar la venta: {ex.GetBaseException().Message}";
+            error = true;
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private async Task EliminarVenta()
+    {
+        if (guardando || eliminando)
+            return;
+
+        if (!await JS.InvokeAsync<bool>("confirm", $"¿Eliminar la venta {Id} y devolver los productos al inventario?"))
+            return;
+
+        eliminando = true;
+        try
+        {
+            var resultado = await ServicesVentas.Eliminar(Id);
+            if (resultado.IsFailure)
+            {
+                mensaje = resultado.Error.Description;
+                error = true;
+                return;
+            }
+
+            Navigation.NavigateTo("/Index?ventaEliminada=true");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al eliminar la venta: {ex}");
+            mensaje = $"Ocurrió un error al eliminar la venta: {ex.GetBaseException().Message}";
+            error = true;
+        }
+        finally
+        {
+            eliminando = false;
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/Index");
+    }
+}

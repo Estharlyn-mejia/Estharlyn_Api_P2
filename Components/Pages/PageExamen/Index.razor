@@ -4,7 +4,6 @@
 @using Microsoft.AspNetCore.Components.QuickGrid
 @inject ServicesVentas ServicesVentas
 @inject NavigationManager Navigation
-@inject IJSRuntime JS
 @rendermode InteractiveServer
 
 <PageTitle>Ventas de cafe</PageTitle>
@@ -13,8 +12,8 @@
     <div class="card shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center bg-light">
             <h5 class="card-title mb-0">Consulta de ventas</h5>
-            <button type="button" 
-                    class="btn btn-primary" 
+            <button type="button"
+                    class="btn btn-primary"
                     @onclick="MostrarPantallaCrear">
                 Registrar venta
             </button>
@@ -33,47 +32,47 @@
                     <label class="form-label" for="filtroVentaId">
                         <strong>VentaId</strong>
                     </label>
-                    <InputNumber id="filtroVentaId" 
-                                TValue="int?" 
-                                class="form-control" 
-                                @bind-Value="ventaIdFiltro" />
+                    <input id="filtroVentaId"
+                            type="number"
+                            class="form-control"
+                            @bind="ventaIdFiltro" />
                 </div>
                 <div class="col-sm-6 col-lg-3">
                     <label class="form-label" for="filtroConcepto">
                         <strong>Concepto</strong>
                     </label>
-                    <input id="filtroConcepto" 
-                            class="form-control" 
-                            @bind="conceptoFiltro" 
+                    <input id="filtroConcepto"
+                            class="form-control"
+                            @bind="conceptoFiltro"
                             placeholder="Producto u observacion" />
                 </div>
                 <div class="col-sm-6 col-lg-2">
                     <label class="form-label" for="fechaDesde">
                         <strong>Fecha desde</strong>
                     </label>
-                    <InputDate id="fechaDesde" 
-                                TValue="DateTime?" 
-                                class="form-control" 
-                                @bind-Value="fechaDesde" />
+                    <input id="fechaDesde"
+                            type="date"
+                            class="form-control"
+                            @bind="fechaDesde" />
                 </div>
                 <div class="col-sm-6 col-lg-2">
                     <label class="form-label" for="fechaHasta">
-                        <strong>Fehca hasta</strong>
+                        <strong>Fecha hasta</strong>
                     </label>
-                    <InputDate id="fechaHasta" 
-                                TValue="DateTime?" 
-                                class="form-control" 
-                                @bind-Value="fechaHasta" />
+                    <input id="fechaHasta"
+                            type="date"
+                            class="form-control"
+                            @bind="fechaHasta" />
                 </div>
                 <div class="col-lg-auto">
-                    <button type="button" 
-                            class="btn btn-outline-primary" 
+                    <button type="button"
+                            class="btn btn-outline-primary"
                             @onclick="Buscar">
                         Buscar
                     </button>
 
-                    <button type="button" 
-                            class="btn btn-outline-secondary" 
+                    <button type="button"
+                            class="btn btn-outline-secondary"
                             @onclick="Restablecer">
                         Restablecer
                     </button>
@@ -94,7 +93,7 @@
                     <TemplateColumn Title="Productos">
                         @foreach (var detalle in context.Detalles)
                         {
-                            <div>@detalle.Producto.Nombre x @detalle.Cantidad</div>
+                            <div>@(detalle.Producto?.Nombre ?? "Producto no encontrado") x @detalle.Cantidad</div>
                         }
                     </TemplateColumn>
                     <PropertyColumn Property="venta => venta.Total" Title="Total" Format="C" Sortable="true" />
@@ -103,11 +102,6 @@
                                 class="btn btn-outline-warning btn-sm me-1"
                                 @onclick="() => MostrarPantallaEditar(context.VentaId)">
                             Modificar
-                        </button>
-                        <button type="button"
-                                class="btn btn-outline-danger btn-sm"
-                                @onclick="() => Eliminar(context.VentaId)">
-                            Eliminar
                         </button>
                     </TemplateColumn>
                 </QuickGrid>
@@ -131,7 +125,27 @@
     private bool esError;
     private bool cargando = true;
 
-    protected override Task OnInitializedAsync() => Buscar();
+    [SupplyParameterFromQuery(Name = "ventaGuardada")]
+    public bool ventaGuardada { get; set; }
+
+    [SupplyParameterFromQuery(Name = "ventaEliminada")]
+    public bool ventaEliminada { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Buscar();
+
+        if (ventaGuardada && !esError)
+        {
+            mensaje = "La venta se guardó correctamente.";
+            esError = false;
+        }
+        else if (ventaEliminada && !esError)
+        {
+            mensaje = "La venta se eliminó y el stock fue restituido correctamente.";
+            esError = false;
+        }
+    }
 
     private async Task Buscar()
     {
@@ -153,29 +167,41 @@
         var desde = fechaDesde?.Date;
         var hastaExclusivo = fechaHasta?.Date.AddDays(1);
 
-        var resultado = await ServicesVentas.GetList(venta =>
-            (!id.HasValue || venta.VentaId == id.Value) &&
-            (string.IsNullOrEmpty(concepto) ||
-                (venta.Observacion != null && venta.Observacion.Contains(concepto)) ||
-                venta.Detalles.Any(detalle => detalle.Producto.Nombre.Contains(concepto))) &&
-            (!desde.HasValue || venta.Fecha >= desde.Value) &&
-            (!hastaExclusivo.HasValue || venta.Fecha < hastaExclusivo.Value));
+        try
+        {
+            var resultado = await ServicesVentas.GetList(venta =>
+                (!id.HasValue || venta.VentaId == id.Value) &&
+                (string.IsNullOrEmpty(concepto) ||
+                    (venta.Observacion != null && venta.Observacion.Contains(concepto)) ||
+                    venta.Detalles.Any(detalle => detalle.Producto.Nombre.Contains(concepto))) &&
+                (!desde.HasValue || venta.Fecha >= desde.Value) &&
+                (!hastaExclusivo.HasValue || venta.Fecha < hastaExclusivo.Value));
 
-        if (resultado.IsSuccess)
-        {
-            ListaVentas = resultado.Value
-                .OrderByDescending(venta => venta.Fecha)
-                .ThenByDescending(venta => venta.VentaId)
-                .ToList();
+            if (resultado.IsSuccess)
+            {
+                ListaVentas = resultado.Value
+                    .OrderByDescending(venta => venta.Fecha)
+                    .ThenByDescending(venta => venta.VentaId)
+                    .ToList();
+            }
+            else
+            {
+                ListaVentas = [];
+                mensaje = resultado.Error.Description;
+                esError = true;
+            }
         }
-        else
+        catch (Exception ex)
         {
+            Console.Error.WriteLine($"Error al buscar ventas: {ex}");
             ListaVentas = [];
-            mensaje = resultado.Error.Description;
+            mensaje = "Ocurrió un error al cargar las ventas.";
             esError = true;
         }
-
-        cargando = false;
+        finally
+        {
+            cargando = false;
+        }
     }
 
     private async Task Restablecer()
@@ -195,23 +221,5 @@
     private void MostrarPantallaEditar(int id)
     {
         Navigation.NavigateTo($"/Ventas/Editar/{id}");
-    }  
-
-    private async Task Eliminar(int id)
-    {
-        if (!await JS.InvokeAsync<bool>("confirm", $"Eliminar la venta {id} y devolver los productos al inventario?"))
-            return;
-
-        var resultado = await ServicesVentas.Eliminar(id);
-        if (resultado.IsFailure)
-        {
-            mensaje = resultado.Error.Description;
-            esError = true;
-            return;
-        }
-
-        mensaje = "Venta eliminada y stock restituido correctamente.";
-        esError = false;
-        await Buscar();
     }
 }

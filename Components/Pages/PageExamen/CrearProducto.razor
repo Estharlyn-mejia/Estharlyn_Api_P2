@@ -1,0 +1,110 @@
+@page "/Productos/Crear"
+@using Estharlyn_Ap1_P2.Models
+@using Estharlyn_Ap1_P2.Services
+@inject ServicesVentas ServicesVentas
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Crear producto</PageTitle>
+
+<div class="container-fluid mt-4 px-3 px-lg-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <h3 class="mb-0">Crear producto</h3>
+        </div>
+
+        <EditForm Model="@producto"
+                OnValidSubmit="@Guardar"
+                FormName="CrearProductoForm">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="card-body">
+                @if (!string.IsNullOrWhiteSpace(mensaje))
+                {
+                    <div class="alert alert-danger" role="alert">
+                        @mensaje
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label" for="nombre">Nombre</label>
+                    <InputText id="nombre"
+                                class="form-control"
+                                @bind-Value="producto.Nombre" />
+                    <ValidationMessage For="@(() => producto.Nombre)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="precio">Precio</label>
+                    <InputNumber id="precio"
+                                class="form-control"
+                                min="0.01"
+                                step="0.01"
+                                @bind-Value="producto.Precio" />
+                    <ValidationMessage For="@(() => producto.Precio)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="stock">Stock disponible</label>
+                    <InputNumber id="stock"
+                                class="form-control"
+                                min="0"
+                                @bind-Value="producto.Stock" />
+                    <ValidationMessage For="@(() => producto.Stock)" />
+                </div>
+            </div>
+
+            <div class="card-footer bg-light d-flex justify-content-center gap-2">
+                <button type="submit"
+                        class="btn btn-success"
+                        disabled="@guardando">
+                    @(guardando ? "Guardando..." : "Guardar")
+                </button>
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        @onclick="Volver"
+                        disabled="@guardando">
+                    Cancelar
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private Producto producto = new();
+    private string? mensaje;
+    private bool guardando;
+
+    private async Task Guardar()
+    {
+        if (guardando)
+            return;
+
+        guardando = true;
+        mensaje = null;
+
+        try
+        {
+            if (await ServicesVentas.GuardarProducto(producto))
+            {
+                Navigation.NavigateTo("/Productos");
+                return;
+            }
+
+            mensaje = "No se pudo guardar el producto.";
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error al crear el producto: {ex}");
+            mensaje = "Ocurrió un error al guardar el producto. Intente nuevamente.";
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private void Volver() => Navigation.NavigateTo("/Productos");
+}

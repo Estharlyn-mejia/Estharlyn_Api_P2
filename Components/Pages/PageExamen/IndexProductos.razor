@@ -1,0 +1,76 @@
+@page "/Productos"
+@using Estharlyn_Ap1_P2.Models
+@using Estharlyn_Ap1_P2.Services
+@using Microsoft.AspNetCore.Components.QuickGrid
+@inject ServicesVentas ServicesVentas
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Inventario de Productos</PageTitle>
+
+<div class="container-fluid mt-4 px-3 px-lg-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h3 class="mb-0">Inventario de Productos</h3>
+            <div class="d-flex gap-2">
+                <button type="button" 
+                        class="btn btn-primary" 
+                        @onclick="CrearProducto">
+                    Crear producto
+                </button>
+                <button type="button" 
+                        class="btn btn-outline-primary" 
+                        @onclick="Actualizar" 
+                        disabled="@cargando">
+                    @(cargando ? "Actualizando..." : "Actualizar stock")
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <p class="text-muted">
+                Consulta el precio y las existencias actuales. Esta página es solo de lectura.
+            </p>
+
+            @if (cargando)
+            {
+                <p>Cargando productos...</p>
+            }
+            else
+            {
+                <QuickGrid Items="productos.AsQueryable()" Class="table table-bordered table-striped text-center">
+                    <PropertyColumn Property="producto => producto.ProductoId" Title="ProductoId" Sortable="true" />
+                    <PropertyColumn Property="producto => producto.Nombre" Title="Producto" Sortable="true" />
+                    <PropertyColumn Property="producto => producto.Precio" Title="Precio" Format="C" Sortable="true" />
+                    <PropertyColumn Property="producto => producto.Stock" Title="Stock disponible" Sortable="true" />
+                </QuickGrid>
+
+                <p class="mb-0"><strong>Cantidad de productos:</strong> @productos.Count</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Producto> productos = [];
+    private bool cargando = true;
+
+    protected override Task OnInitializedAsync() => Actualizar();
+
+    private async Task Actualizar()
+    {
+        cargando = true;
+        productos = await ServicesVentas.ListarProductos();
+        cargando = false;
+    }
+
+    private void CrearProducto()
+    {
+        Navigation.NavigateTo("/Productos/Crear");
+    }
+
+    private void EditarProducto(int id)
+    {
+        Navigation.NavigateTo($"/Productos/Editar/{id}");
+    } 
+}

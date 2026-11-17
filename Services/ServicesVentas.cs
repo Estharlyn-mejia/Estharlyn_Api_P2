@@ -156,6 +156,37 @@ public class ServicesVentas(IDbContextFactory<Estharlyn_Ap1_P2.Contexto.Contexto
             .ToListAsync();
     }
 
+    public async Task<Producto?> BuscarProducto(int id)
+    {
+        await using var contexto = await contextFactory.CreateDbContextAsync();
+        return await contexto.Productos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(producto => producto.ProductoId == id);
+    }
+
+    public async Task<bool> GuardarProducto(Producto producto)
+    {
+        await using var contexto = await contextFactory.CreateDbContextAsync();
+        producto.Nombre = producto.Nombre.Trim();
+        contexto.Productos.Add(producto);
+        return await contexto.SaveChangesAsync() > 0;
+    }
+
+    public async Task<bool> ActualizarProducto(Producto producto)
+    {
+        await using var contexto = await contextFactory.CreateDbContextAsync();
+        var existente = await contexto.Productos
+            .FirstOrDefaultAsync(item => item.ProductoId == producto.ProductoId);
+
+        if (existente is null)
+            return false;
+
+        existente.Nombre = producto.Nombre.Trim();
+        existente.Precio = producto.Precio;
+        existente.Stock = producto.Stock;
+        return await contexto.SaveChangesAsync() > 0;
+    }
+
     private static Result Fallo(string codigo, string descripcion) =>
         Result.Failure(new Error(codigo, descripcion));
 }
